@@ -1,0 +1,14 @@
+{
+    "name": "imsop/rabbit-retry",
+    "description": "Delay RabbitMQ messages by a set amount, or re-queue them a limited amount of time.",
+    "require": {
+        "videlalvaro/php-amqplib": "2.4.*"
+    },
+    "license": "MIT",
+
+    "autoload"    : {
+        "psr-4": {
+            "IMSoP\\RabbitRetry\\": "src/"
+        }
+    }
+}
