@@ -2,12 +2,14 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+list(, $rabbit_server, $port, $username, $password, $vhost) = $argv;
+
 $conn = new \PhpAmqpLib\Connection\AMQPStreamConnection(
-    'localhost', 5672, 'guest', 'guest'
+  $rabbit_server, $port, $username, $password, $vhost
 );
 $channel = $conn->channel();
 
-$real_queue = 'test1';
+$real_queue = 'rabbit_retry.v1.test';
 
 $channel->queue_declare($real_queue);
 
