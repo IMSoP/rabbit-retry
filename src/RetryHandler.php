@@ -4,6 +4,8 @@ namespace IMSoP\RabbitRetry;
 
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Wire\AMQPAbstractCollection;
+use PhpAmqpLib\Wire\AMQPTable;
 
 class RetryHandler
 {
@@ -44,8 +46,7 @@ class RetryHandler
     public function retryMessage(AMQPMessage $message)
     {
         // How many times have we re-tried already?
-        $headers = $message->has('application_headers') ? $message->get('application_headers') : array();
-        $previous_retry_count = isset($headers['rabbitretry-attempts']) ? $headers['rabbitretry-attempts'][1] : 0;
+        $previous_retry_count = $this->getHeader($message, 'rabbitretry-attempts') ?: 0;
 
         // Remaining retries, capped off at 0 for sanity
         $remaining_retries = max(0, $this->numRetries - $previous_retry_count);
@@ -58,8 +59,7 @@ class RetryHandler
         else
         {
             // Set the new header
-            $headers['rabbitretry-attempts'] = array('I', $previous_retry_count + 1);
-            $message->set('application_headers', $headers);
+            $this->setMessageHeader($message, 'rabbitretry-attempts',  $previous_retry_count + 1);
 
             // Acknowledge that we've processed this message from the current queue
             $message->delivery_info['channel']->basic_ack($message->delivery_info['delivery_tag']);
@@ -69,5 +69,51 @@ class RetryHandler
         }
 
         return $remaining_retries;
+    }
+    
+    /**
+     * Utility function to get a header from a message, since AMQPLib doesn't wrap this
+     * @todo Move to an adapter class of some sort
+     *
+     * @param AMQPMessage $message
+     * @param string $header_name
+     * @return mixed|null Null if the header is not set, otherwise its value (normally a string)
+     */
+    private function getHeader(AMQPMessage $message, $header_name)
+    {
+        if ( $message->has('application_headers') )
+        {
+            $headers = $message->get('application_headers');
+            if ( $headers instanceof AMQPAbstractCollection )
+            {
+                $headers = $headers->getNativeData();
+            }
+            if ( is_array($headers) && isset($headers[$header_name]) )
+            {
+                return $headers[$header_name];
+            }
+        }
+        return null;
+    }
+    /**
+     * Utility function to set a header on a message, since AMQPLib doesn't wrap this
+     * @todo Move to an adapter class of some sort
+     *
+     * @param AMQPMessage $message
+     * @param string $header_name
+     * @param mixed $value The scalar value to be encoded into the header
+     */
+    private function setMessageHeader(AMQPMessage $message, $header_name, $value)
+    {
+        if ( $message->has('application_headers') )
+        {
+            $headers = $message->get('application_headers');
+        }
+        else
+        {
+            $headers = new AMQPTable;
+        }
+        $headers->set($header_name, $value);
+        $message->set('application_headers', $headers);
     }
 }
